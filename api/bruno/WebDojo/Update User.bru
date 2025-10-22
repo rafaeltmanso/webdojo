@@ -1,0 +1,24 @@
+meta {
+  name: Update User
+  type: http
+  seq: 5
+}
+
+put {
+  url: http://localhost:3333/api/users/126
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "id": 126,
+    "name": "Hubro",
+    "email": "Hubro@example.com"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

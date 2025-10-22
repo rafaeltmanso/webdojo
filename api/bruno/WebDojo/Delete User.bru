@@ -1,0 +1,24 @@
+meta {
+  name: Delete User
+  type: http
+  seq: 6
+}
+
+delete {
+  url: http://localhost:3333/api/users/168
+  body: none
+  auth: inherit
+}
+
+body:json {
+  {
+    "id": 126,
+    "name": "Hubro",
+    "email": "Hubro@example.com"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
