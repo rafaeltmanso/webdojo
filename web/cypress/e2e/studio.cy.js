@@ -1,5 +1,5 @@
 describe('Studio', () => {
-  it('Exemplos do cypress studio', () => {
+  it('Cypress Studio examples', () => {
     cy.visit('https://example.cypress.io')
   })
 })

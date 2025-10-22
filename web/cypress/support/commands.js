@@ -28,32 +28,31 @@ import 'cypress-real-events'
 import './actions/consultancy.actions'
 import { getTodayFormattedDate } from './utils'
 
-
-Cypress.Commands.add("start", () => {
-  cy.visit("/")
+Cypress.Commands.add('start', () => {
+  cy.visit('/')
 })
-  
 
-Cypress.Commands.add("submitLoginform", (email, senha) => {
+Cypress.Commands.add('goToSignup', () => {
+  cy.start()
+  cy.get("a[href='/register']").click()
+  cy.contains('h2', 'Crie sua conta').should('be.visible')
+})
 
-  cy.get("#email").type(email)
-  cy.get("#password").type(senha)
+Cypress.Commands.add('submitLoginform', (email, password) => {
+  cy.get('#email').type(email)
+  cy.get('#password').type(password)
 
-  cy.contains("button", "Entrar")
+  cy.contains('button', 'Entrar').click()
+})
+
+Cypress.Commands.add('goTo', (buttonName, pageTitle) => {
+  cy.contains('button', buttonName)
+
+    .should('be.visible')
     .click()
+
+  cy.contains('h1', pageTitle).should('be.visible')
 })
-
-Cypress.Commands.add("goTo", (buttonName, pageTitle) => {
-  cy.contains("button", buttonName)
-
-    .should("be.visible")
-    .click()
-
-  cy.contains("h1", pageTitle)
-    .should("be.visible")
-})
-
-
 
 //Helper to login and inject token in localStorage
 Cypress.Commands.add('login', (ui = false) => {
@@ -69,8 +68,7 @@ Cypress.Commands.add('login', (ui = false) => {
     cy.visit('/dashboard', {
       onBeforeLoad(win) {
         win.localStorage.setItem('token', token)
-      }
+      },
     })
   }
 })
-

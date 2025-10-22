@@ -1,22 +1,25 @@
-import { getTodayFormattedDate } from "../support/utils"
+import { getTodayFormattedDate } from '../support/utils'
 
-describe("Login", () => {
-
-
-  it("Deve logar com sucesso", () => {
+describe('Login', () => {
+  it('should login successfully', () => {
     cy.start()
-    cy.submitLoginform("papito@webdojo.com", "katana123")
+    cy.submitLoginform('papito@webdojo.com', 'katana123')
     cy.get('[data-cy="user-name"]')
-      .should("be.visible")
-      .and("have.text", "Fernando Papito")
+      .should('be.visible')
+      .and('have.text', 'Fernando Papito')
 
     cy.get('[data-cy="welcome-message"]')
-      .should("be.visible")
-      .and("have.text", "Olá QA, esse é o seu Dojo para aprender Automação de Testes.")
+      .should('be.visible')
+      .and(
+        'have.text',
+        'Olá QA, esse é o seu Dojo para aprender Automação de Testes.'
+      )
 
-    cy.getCookie('login_date').should('exist').then((cookie) => {
-      expect(cookie.value).to.eq(getTodayFormattedDate())
-    })
+    cy.getCookie('login_date')
+      .should('exist')
+      .then((cookie) => {
+        expect(cookie.value).to.eq(getTodayFormattedDate())
+      })
 
     cy.window().then((win) => {
       const token = win.localStorage.getItem('token')
@@ -24,16 +27,15 @@ describe("Login", () => {
     })
   })
 
-  it("Não deve logar com senha inválida", () => {
+  it('should not login with invalid password', () => {
     cy.start()
-    cy.submitLoginform("papito@webdojo.com", "katana321")
-    cy.contains("Acesso negado! Tente novamente.").should("be.visible")
+    cy.submitLoginform('papito@webdojo.com', 'katana321')
+    cy.contains('Acesso negado! Tente novamente.').should('be.visible')
   })
 
-  it("Não deve logar com email não cadastrado", () => {
+  it('should not login with unregistered email', () => {
     cy.start()
-    cy.submitLoginform("404@webdojo.com", "katana123")
-    cy.contains("Acesso negado! Tente novamente.").should("be.visible")
+    cy.submitLoginform('404@webdojo.com', 'katana123')
+    cy.contains('Acesso negado! Tente novamente.').should('be.visible')
   })
 })
-

@@ -1,15 +1,11 @@
-describe('Links abrindo nova guia/janela', () => {
+describe('Links opening new tab/window', () => {
+  beforeEach(() => {
+    cy.login()
+  })
 
-    beforeEach(() => {
-        cy.login()
-    })
-
-    it('Valindando o atributo do link do Instagram', () => {
-
-
-        cy.get('[data-cy="instagram-link"]')
-            .should('have.attr', 'href', 'https://www.instagram.com/qapapito')
-            .should('have.attr', 'target', '_blank')
-
-    })
+  it('should validate Instagram link attribute', () => {
+    cy.get('[data-cy="instagram-link"]')
+      .should('have.attr', 'href', 'https://www.instagram.com/qapapito')
+      .should('have.attr', 'target', '_blank')
+  })
 })

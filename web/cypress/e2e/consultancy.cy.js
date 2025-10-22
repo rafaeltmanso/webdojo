@@ -1,31 +1,32 @@
 import { personal, company } from '../fixtures/consultancy.json'
 
-describe('Formulário de Consultoria', () => {
+describe('Consultancy Form', () => {
   beforeEach(() => {
     cy.login()
     cy.goTo('Formulários', 'Consultoria')
     cy.fixture('consultancy').as('consultancyData')
   })
 
-  it('Deve sollicitar consltoria individual', () => {
+  it('should request individual consultancy', () => {
     cy.fillConsultancyForm(personal)
     cy.submitConsultancyForm()
     cy.validateConsultancyModal()
-
   })
-  it('Deve sollicitar consltoria In Company', () => {
+  it('should request in-company consultancy', () => {
     cy.fillConsultancyForm(company)
     cy.submitConsultancyForm()
     cy.validateConsultancyModal()
-
   })
-  it('Deve verificar os Campos obrigatórios', () => {
+  it('should validate required fields', () => {
     cy.submitConsultancyForm()
 
     const requiredFields = [
       { label: 'Nome Completo', message: 'Campo obrigatório' },
       { label: 'Email', message: 'Campo obrigatório' },
-      { label: 'termos de uso', message: 'Você precisa aceitar os termos de uso' }
+      {
+        label: 'termos de uso',
+        message: 'Você precisa aceitar os termos de uso',
+      },
     ]
 
     requiredFields.forEach(({ label, message }) => {
