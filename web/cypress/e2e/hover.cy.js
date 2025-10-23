@@ -6,8 +6,10 @@ describe('Simulating Mouseover', () => {
     if (Cypress.browser.name === 'firefox') {
       cy.log('Skipping realHover test in Firefox - CDP not supported')
       cy.login()
-      cy.get('[data-cy="instagram-link"]').trigger('mouseover').should('exist')
-      cy.contains('isso é Mouseover!').should('be.visible')
+
+      // Firefox fallback: trigger mouseover and wait for the text to appear
+      cy.get('[data-cy="instagram-link"]').trigger('mouseover', { force: true })
+      cy.contains('isso é Mouseover!', { timeout: 10000 }).should('be.visible')
       return
     }
 

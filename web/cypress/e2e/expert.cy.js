@@ -65,8 +65,10 @@ describe('Expert', () => {
     // Using realPress from cypress-real-events for TAB navigation
     // Skip in Firefox - realPress uses CDP (Chrome DevTools Protocol)
     if (Cypress.browser.name === 'firefox') {
-      cy.log('Skipping realPress test in Firefox - CDP not supported')
-      cy.get('#email').type('papito@web.com{tab}')
+      cy.log('Using Firefox-compatible TAB navigation')
+
+      // Firefox: Use tab() command or focus next element directly
+      cy.get('#email').type('papito@web.com').tab()
       cy.focused().should('have.attr', 'id', 'password')
       return
     }
