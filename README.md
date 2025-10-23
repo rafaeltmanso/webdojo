@@ -209,9 +209,25 @@ npm run test:login:mobile
 - `iframe.cy.js` - iFrame interactions
 - `hover.cy.js` - Mouseover events
 - `links.cy.js` - External link validation
-- `cep.cy.js` - API integration testing
+- `cep.cy.js` - API integration testing with ViaCEP API mocking
 - `expert.cy.js` - Advanced Cypress techniques
 - `studio.cy.js` - Cypress Studio examples
+
+### CI/CD Integration
+
+This project is integrated with **Cypress Cloud** and **GitHub Actions** for automated testing:
+
+```bash
+# Tests automatically run on push/PR via GitHub Actions
+# Results are uploaded to Cypress Cloud dashboard
+```
+
+**Features:**
+- Automated test execution on every push and pull request
+- Test recordings and video replays in Cypress Cloud
+- Performance analytics and flaky test detection
+- Team collaboration with shared test results
+- Historical test run data and trends
 
 ---
 
@@ -328,6 +344,25 @@ cy.validateConsultancyModal()   // Verify success modal
 
 ## 🧩 Testing Patterns
 
+### API Mocking with cy.intercept()
+```javascript
+// Mock external API responses for reliable, fast tests
+cy.intercept('GET', `https://viacep.com.br/ws/${address.cep}/json/`, {
+  statusCode: 200,
+  body: {
+    cep: address.cep,
+    logradouro: address.street,
+    bairro: address.neighborhood,
+    localidade: address.city,
+    uf: address.state
+  }
+}).as('getCep')
+
+cy.get('#cep').type(address.cep)
+cy.contains('button', 'Buscar').click()
+cy.wait('@getCep')  // Wait for intercepted request
+```
+
 ### Database Cleanup Pattern
 ```javascript
 beforeEach(() => {
@@ -398,6 +433,8 @@ This project was developed as part of the **Ninja do Cypress** course by **Ferna
 - ✅ Token-based authentication strategies
 - ✅ Mass data generation and cleanup utilities
 - ✅ Mobile and desktop viewport testing configurations
+- ✅ API mocking with cy.intercept() for external services
+- ✅ CI/CD pipeline with GitHub Actions and Cypress Cloud integration
 
 **Course by:** [Fernando Papito](https://ninjadocypress.com.br)  
 **Implementation by:** Rafael Manso  
