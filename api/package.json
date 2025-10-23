@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npx cypress run",
+    "test:ui": "npx cypress open",
+    "test:ci": "npx cypress run --record --parallel --key ${bc773fd5-211a-4ebe-b549-8a1c311205c9}"
+
   },
   "keywords": [],
   "author": "",

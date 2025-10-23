@@ -1,0 +1,220 @@
+name: API Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - '.github/workflows/cypress-api-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'api/**'
+  workflow_dispatch:
+    inputs:
+      browser:
+        description: 'Browser to run tests'
+        required: true
+        default: 'chrome'
+        type: choice
+        options:
+          - chrome
+          - firefox
+          - edge
+      spec:
+        description: 'Specific test to run (leave empty for all)'
+        required: false
+        type: string
+        default: ''
+      record:
+        description: 'Record to Cypress Cloud'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  # Job 1: API Tests (auto-triggered)
+  api-tests:
+    name: API Tests - Chrome
+    runs-on: ubuntu-22.04
+    if: github.event_name != 'workflow_dispatch'
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dba
+          POSTGRES_PASSWORD: dba
+          POSTGRES_DB: UserDB
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # ===== API SETUP =====
+      - name: Install API dependencies
+        working-directory: ./api
+        run: npm install
+
+      - name: Generate Prisma Client
+        working-directory: ./api
+        run: npx prisma generate
+
+      - name: Run Prisma migrations
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npx prisma migrate deploy
+
+      - name: Start API server in background
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npm start &
+
+      - name: Wait for API to start
+        run: sleep 5
+
+      - name: Verify API is running
+        run: |
+          timeout 30 bash -c 'until curl -f http://localhost:3333/api/users; do sleep 1; done'
+
+      # ===== RUN API TESTS =====
+      - name: Run Cypress API tests
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: ./api
+          browser: chrome
+          record: true
+          group: 'API Tests - Chrome'
+          install: false
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_API_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+
+      - name: Upload screenshots (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: api-screenshots
+          path: api/cypress/screenshots
+          retention-days: 7
+
+      - name: Upload videos (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: api-videos
+          path: api/cypress/videos
+          retention-days: 7
+
+  # Job 2: Manual Trigger with Custom Parameters
+  api-manual:
+    name: Manual API Run - ${{ inputs.browser }}
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_dispatch'
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dba
+          POSTGRES_PASSWORD: dba
+          POSTGRES_DB: UserDB
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install API dependencies
+        working-directory: ./api
+        run: npm install
+
+      - name: Generate Prisma Client
+        working-directory: ./api
+        run: npx prisma generate
+
+      - name: Run Prisma migrations
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npx prisma migrate deploy
+
+      - name: Start API server in background
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npm start &
+
+      - name: Wait for API to start
+        run: sleep 5
+
+      - name: Verify API is running
+        run: |
+          timeout 30 bash -c 'until curl -f http://localhost:3333/api/users; do sleep 1; done'
+
+      # Run tests with custom parameters
+      - name: Run Cypress API tests (Custom)
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: ./api
+          browser: ${{ inputs.browser }}
+          record: ${{ inputs.record }}
+          group: 'API Tests - ${{ inputs.browser }} (Manual)'
+          spec: ${{ inputs.spec }}
+          install: false
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_API_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+
+      - name: Upload screenshots (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: api-manual-${{ inputs.browser }}-screenshots
+          path: api/cypress/screenshots
+          retention-days: 7
+
+      - name: Upload videos (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: api-manual-${{ inputs.browser }}-videos
+          path: api/cypress/videos
+          retention-days: 7
+
+      # Summary of manual run
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "### Manual API Test Run Summary 🎯" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Browser**: ${{ inputs.browser }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Spec**: ${{ inputs.spec || 'All API tests' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cypress Cloud**: ${{ inputs.record && '✅ Enabled' || '❌ Disabled' }}" >> $GITHUB_STEP_SUMMARY
