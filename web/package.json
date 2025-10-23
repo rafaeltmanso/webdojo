@@ -7,7 +7,9 @@
     "test": "npx cypress run --config viewportWidth=1920,viewportHeight=1080",
     "test:ui": "npx cypress open",
     "test:login": "npx cypress run --spec cypress/e2e/login.cy.js --config viewportWidth=1920,viewportHeight=1080",
-    "test:login:mobile": "npx cypress run --spec cypress/e2e/login.cy.js --config viewportWidth=414,viewportHeight=896"
+    "test:login:mobile": "npx cypress run --spec cypress/e2e/login.cy.js --config viewportWidth=414,viewportHeight=896",
+    "test:ci": "npx cypress run --record --parallel --key ${feadc80b-6726-4a6d-bbe8-7d6563043e3d}"
+    
   },
   "dependencies": {
     "serve": "^14.2.4"
@@ -20,3 +22,4 @@
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
+
