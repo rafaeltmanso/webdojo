@@ -61,22 +61,16 @@ describe('Expert', () => {
     cy.get('.toast .title').should('contain', 'Acesso negado')
   })
 
-  it('should simulate TAB key to navigate between fields', () => {
-    // Using realPress from cypress-real-events for TAB navigation
-    // Skip in Firefox - realPress uses CDP (Chrome DevTools Protocol)
-    if (Cypress.browser.name === 'firefox') {
-      cy.log('Using Firefox-compatible TAB navigation')
-
-      // Firefox: Use tab() command or focus next element directly
-      cy.get('#email').type('papito@web.com').tab()
+  it(
+    'should simulate TAB key to navigate between fields',
+    { browser: '!firefox' },
+    () => {
+      // Using realPress from cypress-real-events for TAB navigation
+      cy.get('#email').type('papito@web.com')
+      cy.get('#email').realPress('Tab')
       cy.focused().should('have.attr', 'id', 'password')
-      return
     }
-
-    cy.get('#email').type('papito@web.com')
-    cy.get('#email').realPress('Tab')
-    cy.focused().should('have.attr', 'id', 'password')
-  })
+  )
 
   it('should simulate other useful keys', () => {
     // Backspace - delete characters
