@@ -78,6 +78,10 @@ jobs:
         working-directory: ./api
         run: npm install
 
+      - name: Generate Prisma Client
+        working-directory: ./api
+        run: npx prisma generate
+
       - name: Run Prisma migrations
         working-directory: ./api
         env:
@@ -89,6 +93,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
         run: npm start &
+
+      - name: Wait for API to start
+        run: sleep 5
 
       - name: Verify API is running
         run: |
@@ -102,6 +109,9 @@ jobs:
       - name: Start Web server in background
         working-directory: ./web
         run: npm run dev &
+
+      - name: Wait for Web to start
+        run: sleep 3
 
       - name: Verify Web is running
         run: |
@@ -171,6 +181,10 @@ jobs:
         working-directory: ./api
         run: npm install
 
+      - name: Generate Prisma Client
+        working-directory: ./api
+        run: npx prisma generate
+
       - name: Run Prisma migrations
         working-directory: ./api
         env:
@@ -183,6 +197,9 @@ jobs:
           DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
         run: npm start &
 
+      - name: Wait for API to start
+        run: sleep 5
+
       - name: Verify API is running
         run: |
           timeout 30 bash -c 'until curl -f http://localhost:3333/api/users; do sleep 1; done'
@@ -194,6 +211,9 @@ jobs:
       - name: Start Web server in background
         working-directory: ./web
         run: npm run dev &
+
+      - name: Wait for Web to start
+        run: sleep 3
 
       - name: Verify Web is running
         run: |
@@ -263,6 +283,10 @@ jobs:
         working-directory: ./api
         run: npm install
 
+      - name: Generate Prisma Client
+        working-directory: ./api
+        run: npx prisma generate
+
       - name: Run Prisma migrations
         working-directory: ./api
         env:
@@ -275,6 +299,9 @@ jobs:
           DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
         run: npm start &
 
+      - name: Wait for API to start
+        run: sleep 5
+
       - name: Verify API is running
         run: |
           timeout 30 bash -c 'until curl -f http://localhost:3333/api/users; do sleep 1; done'
@@ -286,6 +313,9 @@ jobs:
       - name: Start Web server in background
         working-directory: ./web
         run: npm run dev &
+
+      - name: Wait for Web to start
+        run: sleep 3
 
       - name: Verify Web is running
         run: |
