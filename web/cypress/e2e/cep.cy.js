@@ -1,16 +1,32 @@
 import address from '../fixtures/cep.json'
 
-describe('ZIP Code', () => {
+describe('CEP Tests', () => {
   beforeEach(() => {
     cy.login()
-    cy.goTo('Integração', 'Consulta de CEP')
+
+    // Mock the external API to avoid flakiness
+    cy.intercept('GET', 'https://viacep.com.br/ws/*/json/', {
+      statusCode: 200,
+      body: {
+        cep: '04534-011',
+        logradouro: 'Rua Joaquim Floriano',
+        bairro: 'Itaim Bibi',
+        localidade: 'São Paulo',
+        uf: 'SP',
+      },
+    }).as('getCep')
+
+    cy.goTo('cep', 'Buscar CEP')
   })
-  it('should query a valid ZIP code', () => {
-    cy.get('#cep').type(address.cep)
-    cy.contains('button', 'Buscar').click()
-    cy.get('#street').should('have.value', address.street)
-    cy.get('#neighborhood').should('have.value', address.neighborhood)
-    cy.get('#city').should('have.value', address.city)
-    cy.get('#state').should('have.value', address.state)
+
+  it('should fetch address by CEP', () => {
+    cy.get('#cep').type('04534011')
+
+    cy.wait('@getCep')
+
+    cy.get('#street').should('have.value', 'Rua Joaquim Floriano')
+    cy.get('#neighborhood').should('have.value', 'Itaim Bibi')
+    cy.get('#city').should('have.value', 'São Paulo')
+    cy.get('#state').should('have.value', 'SP')
   })
 })
