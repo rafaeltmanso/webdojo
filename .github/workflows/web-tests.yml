@@ -1,0 +1,276 @@
+name: Web E2E Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'api/**'
+      - '.github/workflows/web-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'api/**'
+  workflow_dispatch:
+
+jobs:
+  # Job 1: Desktop E2E Tests with Parallelization
+  web-desktop:
+    name: Web E2E - Desktop (Chrome)
+    runs-on: ubuntu-22.04
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dba
+          POSTGRES_PASSWORD: dba
+          POSTGRES_DB: UserDB
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        containers: [1, 2, 3] # Run 3 parallel containers
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # Setup API (dependency for web tests)
+      - name: Install API dependencies
+        working-directory: ./api
+        run: npm ci
+
+      - name: Run Prisma migrations
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npx prisma migrate deploy
+
+      - name: Start API server
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npm start &
+
+      - name: Wait for API
+        run: npx wait-on http://localhost:3333 --timeout 30000
+
+      # Setup Web
+      - name: Install Web dependencies
+        working-directory: ./web
+        run: npm ci
+
+      - name: Start Web server
+        working-directory: ./web
+        run: npm run dev &
+
+      - name: Wait for Web
+        run: npx wait-on http://localhost:3000 --timeout 30000
+
+      # Run Tests
+      - name: Run Cypress Web E2E tests (Desktop)
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: ./web
+          browser: chrome
+          record: true
+          parallel: true
+          group: 'Web E2E - Desktop'
+          config: viewportWidth=1920,viewportHeight=1080
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload test artifacts (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-desktop-artifacts-${{ matrix.containers }}
+          path: |
+            web/cypress/screenshots
+            web/cypress/videos
+          retention-days: 7
+
+  # Job 2: Mobile E2E Tests
+  web-mobile:
+    name: Web E2E - Mobile (Chrome)
+    runs-on: ubuntu-22.04
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dba
+          POSTGRES_PASSWORD: dba
+          POSTGRES_DB: UserDB
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install API dependencies
+        working-directory: ./api
+        run: npm ci
+
+      - name: Run Prisma migrations
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npx prisma migrate deploy
+
+      - name: Start API server
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npm start &
+
+      - name: Wait for API
+        run: npx wait-on http://localhost:3333 --timeout 30000
+
+      - name: Install Web dependencies
+        working-directory: ./web
+        run: npm ci
+
+      - name: Start Web server
+        working-directory: ./web
+        run: npm run dev &
+
+      - name: Wait for Web
+        run: npx wait-on http://localhost:3000 --timeout 30000
+
+      - name: Run Cypress Web E2E tests (Mobile - Login)
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: ./web
+          browser: chrome
+          record: true
+          group: 'Web E2E - Mobile'
+          config: viewportWidth=414,viewportHeight=896
+          spec: cypress/e2e/login.cy.js
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload mobile test artifacts (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-mobile-artifacts
+          path: |
+            web/cypress/screenshots
+            web/cypress/videos
+          retention-days: 7
+
+  # Job 3: Multi-Browser Testing (Nightly or Manual)
+  web-cross-browser:
+    name: Web E2E - Cross Browser
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dba
+          POSTGRES_PASSWORD: dba
+          POSTGRES_DB: UserDB
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox, edge]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install API dependencies
+        working-directory: ./api
+        run: npm ci
+
+      - name: Run Prisma migrations
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npx prisma migrate deploy
+
+      - name: Start API server
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npm start &
+
+      - name: Install Web dependencies
+        working-directory: ./web
+        run: npm ci
+
+      - name: Start Web server
+        working-directory: ./web
+        run: npm run dev &
+
+      - name: Wait for services
+        run: |
+          npx wait-on http://localhost:3333 --timeout 30000
+          npx wait-on http://localhost:3000 --timeout 30000
+
+      - name: Run Cypress tests (${{ matrix.browser }})
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: ./web
+          browser: ${{ matrix.browser }}
+          record: true
+          group: 'Web E2E - ${{ matrix.browser }}'
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload browser-specific artifacts (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-${{ matrix.browser }}-artifacts
+          path: |
+            web/cypress/screenshots
+            web/cypress/videos
+          retention-days: 7
