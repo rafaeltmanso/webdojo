@@ -43,11 +43,16 @@ on:
         type: boolean
 
 jobs:
-  # Job 1: Desktop E2E Tests (auto-triggered)
+  # Job 1: Desktop E2E Tests - Multi-Browser (auto-triggered)
   web-desktop:
-    name: Web E2E - Desktop (Chrome)
+    name: Web E2E - Desktop (${{ matrix.browser }})
     runs-on: ubuntu-22.04
     if: github.event_name != 'workflow_dispatch'
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox, edge]
     
     services:
       postgres:
@@ -118,13 +123,13 @@ jobs:
           timeout 30 bash -c 'until curl -f http://localhost:3000; do sleep 1; done'
 
       # ===== RUN TESTS =====
-      - name: Run Cypress Web E2E tests (Desktop)
+      - name: Run Cypress Web E2E tests (${{ matrix.browser }})
         uses: cypress-io/github-action@v6
         with:
           working-directory: ./web
-          browser: chrome
+          browser: ${{ matrix.browser }}
           record: true
-          group: 'Web E2E - Desktop'
+          group: 'Web E2E - Desktop - ${{ matrix.browser }}'
           config: viewportWidth=1920,viewportHeight=1080
           install: false
         env:
@@ -135,7 +140,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: web-desktop-screenshots
+          name: web-desktop-${{ matrix.browser }}-screenshots
           path: web/cypress/screenshots
           retention-days: 7
 
@@ -143,7 +148,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: web-desktop-videos
+          name: web-desktop-${{ matrix.browser }}-videos
           path: web/cypress/videos
           retention-days: 7
 
