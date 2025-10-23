@@ -1,0 +1,346 @@
+name: Web E2E Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'api/**'
+      - '.github/workflows/cypress-web-tests.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'api/**'
+  workflow_dispatch:
+    inputs:
+      browser:
+        description: 'Browser to run tests'
+        required: true
+        default: 'chrome'
+        type: choice
+        options:
+          - chrome
+          - firefox
+          - edge
+      viewport:
+        description: 'Viewport configuration'
+        required: true
+        default: 'desktop'
+        type: choice
+        options:
+          - desktop
+          - mobile
+      spec:
+        description: 'Specific test to run (leave empty for all)'
+        required: false
+        type: string
+        default: ''
+      record:
+        description: 'Record to Cypress Cloud'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  # Job 1: Desktop E2E Tests (auto-triggered)
+  web-desktop:
+    name: Web E2E - Desktop (Chrome)
+    runs-on: ubuntu-22.04
+    if: github.event_name != 'workflow_dispatch'
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dba
+          POSTGRES_PASSWORD: dba
+          POSTGRES_DB: UserDB
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # ===== API SETUP (required for web tests) =====
+      - name: Install API dependencies
+        working-directory: ./api
+        run: npm install
+
+      - name: Run Prisma migrations
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npx prisma migrate deploy
+
+      - name: Start API server in background
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npm start &
+
+      - name: Verify API is running
+        run: |
+          timeout 30 bash -c 'until curl -f http://localhost:3333/api/users; do sleep 1; done'
+
+      # ===== WEB SETUP =====
+      - name: Install Web dependencies
+        working-directory: ./web
+        run: npm install
+
+      - name: Start Web server in background
+        working-directory: ./web
+        run: npm run dev &
+
+      - name: Verify Web is running
+        run: |
+          timeout 30 bash -c 'until curl -f http://localhost:3000; do sleep 1; done'
+
+      # ===== RUN TESTS =====
+      - name: Run Cypress Web E2E tests (Desktop)
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: ./web
+          browser: chrome
+          record: true
+          group: 'Web E2E - Desktop'
+          config: viewportWidth=1920,viewportHeight=1080
+          install: false
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload screenshots (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-desktop-screenshots
+          path: web/cypress/screenshots
+          retention-days: 7
+
+      - name: Upload videos (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-desktop-videos
+          path: web/cypress/videos
+          retention-days: 7
+
+  # Job 2: Mobile E2E Tests (auto-triggered, login only)
+  web-mobile:
+    name: Web E2E - Mobile (Chrome)
+    runs-on: ubuntu-22.04
+    if: github.event_name != 'workflow_dispatch'
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dba
+          POSTGRES_PASSWORD: dba
+          POSTGRES_DB: UserDB
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install API dependencies
+        working-directory: ./api
+        run: npm install
+
+      - name: Run Prisma migrations
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npx prisma migrate deploy
+
+      - name: Start API server in background
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npm start &
+
+      - name: Verify API is running
+        run: |
+          timeout 30 bash -c 'until curl -f http://localhost:3333/api/users; do sleep 1; done'
+
+      - name: Install Web dependencies
+        working-directory: ./web
+        run: npm install
+
+      - name: Start Web server in background
+        working-directory: ./web
+        run: npm run dev &
+
+      - name: Verify Web is running
+        run: |
+          timeout 30 bash -c 'until curl -f http://localhost:3000; do sleep 1; done'
+
+      - name: Run Cypress Web E2E tests (Mobile - Login)
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: ./web
+          browser: chrome
+          record: true
+          group: 'Web E2E - Mobile'
+          config: viewportWidth=414,viewportHeight=896
+          spec: cypress/e2e/login.cy.js
+          install: false
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload screenshots (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-mobile-screenshots
+          path: web/cypress/screenshots
+          retention-days: 7
+
+      - name: Upload videos (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-mobile-videos
+          path: web/cypress/videos
+          retention-days: 7
+
+  # Job 3: Manual Trigger with Custom Parameters
+  web-manual:
+    name: Manual Run - ${{ inputs.browser }} (${{ inputs.viewport }})
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'workflow_dispatch'
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dba
+          POSTGRES_PASSWORD: dba
+          POSTGRES_DB: UserDB
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install API dependencies
+        working-directory: ./api
+        run: npm install
+
+      - name: Run Prisma migrations
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npx prisma migrate deploy
+
+      - name: Start API server in background
+        working-directory: ./api
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+        run: npm start &
+
+      - name: Verify API is running
+        run: |
+          timeout 30 bash -c 'until curl -f http://localhost:3333/api/users; do sleep 1; done'
+
+      - name: Install Web dependencies
+        working-directory: ./web
+        run: npm install
+
+      - name: Start Web server in background
+        working-directory: ./web
+        run: npm run dev &
+
+      - name: Verify Web is running
+        run: |
+          timeout 30 bash -c 'until curl -f http://localhost:3000; do sleep 1; done'
+
+      # Set viewport dimensions based on input
+      - name: Set viewport config
+        id: viewport
+        run: |
+          if [ "${{ inputs.viewport }}" == "mobile" ]; then
+            echo "width=414" >> $GITHUB_OUTPUT
+            echo "height=896" >> $GITHUB_OUTPUT
+          else
+            echo "width=1920" >> $GITHUB_OUTPUT
+            echo "height=1080" >> $GITHUB_OUTPUT
+          fi
+
+      # Run tests with custom parameters
+      - name: Run Cypress tests (Custom)
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: ./web
+          browser: ${{ inputs.browser }}
+          record: ${{ inputs.record }}
+          group: 'Manual - ${{ inputs.browser }} - ${{ inputs.viewport }}'
+          config: viewportWidth=${{ steps.viewport.outputs.width }},viewportHeight=${{ steps.viewport.outputs.height }}
+          spec: ${{ inputs.spec }}
+          install: false
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload screenshots (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: manual-${{ inputs.browser }}-${{ inputs.viewport }}-screenshots
+          path: web/cypress/screenshots
+          retention-days: 7
+
+      - name: Upload videos (on failure)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: manual-${{ inputs.browser }}-${{ inputs.viewport }}-videos
+          path: web/cypress/videos
+          retention-days: 7
+
+      # Summary of manual run
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "### Manual Test Run Summary 🎯" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Browser**: ${{ inputs.browser }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Viewport**: ${{ inputs.viewport }} (${{ steps.viewport.outputs.width }}x${{ steps.viewport.outputs.height }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Spec**: ${{ inputs.spec || 'All tests' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cypress Cloud**: ${{ inputs.record && '✅ Enabled' || '❌ Disabled' }}" >> $GITHUB_STEP_SUMMARY
