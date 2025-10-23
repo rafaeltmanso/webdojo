@@ -36,7 +36,7 @@ The project comprises a dual-workspace architecture:
 - **iFrame Interactions** - Video player controls within iframes
 - **Drag & Drop** - Kanban board with drag-and-drop functionality
 - **Mouseover Events** - Hover interactions and tooltips
-- **API Integration** - ZIP code lookup with external API integration
+- **API Integration** - ZIP code lookup using mocked ViaCEP API (cy.intercept) for reliable, fast tests without external dependencies
 - **GitHub Profile Management** - Dynamic table operations
 - **Authentication** - Login system with token-based authentication
 
