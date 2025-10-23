@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Job 1: Desktop E2E Tests with Parallelization
+  # Job 1: Desktop E2E Tests (Single container, no parallelization)
   web-desktop:
     name: Web E2E - Desktop (Chrome)
     runs-on: ubuntu-22.04
@@ -35,11 +35,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-    strategy:
-      fail-fast: false
-      matrix:
-        containers: [1, 2, 3] # Run 3 parallel containers
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,12 +43,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
       # Setup API (dependency for web tests)
       - name: Install API dependencies
         working-directory: ./api
-        run: npm ci
+        run: npm install
 
       - name: Run Prisma migrations
         working-directory: ./api
@@ -73,7 +67,7 @@ jobs:
       # Setup Web
       - name: Install Web dependencies
         working-directory: ./web
-        run: npm ci
+        run: npm install
 
       - name: Start Web server
         working-directory: ./web
@@ -89,9 +83,9 @@ jobs:
           working-directory: ./web
           browser: chrome
           record: true
-          parallel: true
           group: 'Web E2E - Desktop'
           config: viewportWidth=1920,viewportHeight=1080
+          install: false  # We already installed dependencies
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_RECORD_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -100,7 +94,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: web-desktop-artifacts-${{ matrix.containers }}
+          name: web-desktop-artifacts
           path: |
             web/cypress/screenshots
             web/cypress/videos
@@ -134,11 +128,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
       - name: Install API dependencies
         working-directory: ./api
-        run: npm ci
+        run: npm install
 
       - name: Run Prisma migrations
         working-directory: ./api
@@ -157,7 +150,7 @@ jobs:
 
       - name: Install Web dependencies
         working-directory: ./web
-        run: npm ci
+        run: npm install
 
       - name: Start Web server
         working-directory: ./web
@@ -175,6 +168,7 @@ jobs:
           group: 'Web E2E - Mobile'
           config: viewportWidth=414,viewportHeight=896
           spec: cypress/e2e/login.cy.js
+          install: false
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_RECORD_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -189,11 +183,11 @@ jobs:
             web/cypress/videos
           retention-days: 7
 
-  # Job 3: Multi-Browser Testing (Nightly or Manual)
+  # Job 3: Multi-Browser Testing (Manual trigger only)
   web-cross-browser:
-    name: Web E2E - Cross Browser
+    name: Web E2E - ${{ matrix.browser }}
     runs-on: ubuntu-22.04
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: github.event_name == 'workflow_dispatch'
     
     services:
       postgres:
@@ -223,11 +217,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
       - name: Install API dependencies
         working-directory: ./api
-        run: npm ci
+        run: npm install
 
       - name: Run Prisma migrations
         working-directory: ./api
@@ -243,7 +236,7 @@ jobs:
 
       - name: Install Web dependencies
         working-directory: ./web
-        run: npm ci
+        run: npm install
 
       - name: Start Web server
         working-directory: ./web
@@ -261,6 +254,7 @@ jobs:
           browser: ${{ matrix.browser }}
           record: true
           group: 'Web E2E - ${{ matrix.browser }}'
+          install: false
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_WEB_RECORD_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
