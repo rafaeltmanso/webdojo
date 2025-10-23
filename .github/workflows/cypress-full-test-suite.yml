@@ -1,0 +1,229 @@
+name: Full Test Suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_api_tests:
+        description: 'Run API Tests'
+        required: true
+        default: true
+        type: boolean
+      run_web_tests:
+        description: 'Run Web E2E Tests'
+        required: true
+        default: true
+        type: boolean
+      browser:
+        description: 'Browser for Web tests'
+        required: true
+        default: 'chrome'
+        type: choice
+        options:
+          - chrome
+          - firefox
+          - edge
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  # Job 1: API Tests
+  api-tests:
+    name: API Tests - Full Suite
+    runs-on: ubuntu-22.04
+    if: |
+      github.event_name == 'schedule' || 
+      (github.event_name == 'workflow_dispatch' && inputs.run_api_tests)
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dba
+          POSTGRES_PASSWORD: dba
+          POSTGRES_DB: UserDB
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: api/package-lock.json
+
+      - name: 📦 Install API dependencies
+        working-directory: ./api
+        run: npm ci
+
+      - name: 🗄️ Run Prisma migrations
+        working-directory: ./api
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+
+      - name: 🚀 Start API server
+        working-directory: ./api
+        run: npm run dev &
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+
+      - name: ⏳ Wait for API to be ready
+        run: npx wait-on http://localhost:3333/api/users --timeout 30000
+
+      - name: 🧪 Run Cypress API tests
+        working-directory: ./api
+        run: npx cypress run --browser chrome
+
+      - name: 📹 Upload API test videos
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-videos
+          path: api/cypress/videos
+          retention-days: 7
+
+  # Job 2: Web E2E Tests (runs after API tests pass)
+  web-tests:
+    name: Web E2E - Full Suite (${{ github.event.inputs.browser || 'chrome' }})
+    runs-on: ubuntu-22.04
+    needs: api-tests
+    if: |
+      (github.event_name == 'schedule' || 
+       (github.event_name == 'workflow_dispatch' && inputs.run_web_tests)) &&
+      (needs.api-tests.result == 'success' || needs.api-tests.result == 'skipped')
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: dba
+          POSTGRES_PASSWORD: dba
+          POSTGRES_DB: UserDB
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            web/package-lock.json
+            api/package-lock.json
+
+      - name: 📦 Install API dependencies
+        working-directory: ./api
+        run: npm ci
+
+      - name: 🗄️ Run Prisma migrations
+        working-directory: ./api
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+
+      - name: 🚀 Start API server
+        working-directory: ./api
+        run: npm run dev &
+        env:
+          DATABASE_URL: postgresql://dba:dba@localhost:5432/UserDB
+
+      - name: ⏳ Wait for API to be ready
+        run: npx wait-on http://localhost:3333/api/users --timeout 30000
+
+      - name: 📦 Install Web dependencies
+        working-directory: ./web
+        run: npm ci
+
+      - name: 🌐 Start Web server
+        working-directory: ./web
+        run: npm run dev &
+
+      - name: ⏳ Wait for Web to be ready
+        run: npx wait-on http://localhost:3000 --timeout 30000
+
+      - name: 🧪 Run Cypress Web tests - Desktop
+        working-directory: ./web
+        run: npm run test -- --browser ${{ github.event.inputs.browser || 'chrome' }}
+
+      - name: 📸 Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-test-screenshots
+          path: web/cypress/screenshots
+          retention-days: 7
+
+      - name: 📹 Upload videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-test-videos
+          path: web/cypress/videos
+          retention-days: 7
+
+  # Job 3: Summary Report
+  test-summary:
+    name: Test Suite Summary
+    runs-on: ubuntu-22.04
+    needs: [api-tests, web-tests]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate Summary
+        run: |
+          echo "# 🥷 WebDojo - Full Test Suite Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.api-tests.result }}" == "success" ]; then
+            echo "✅ **API Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.api-tests.result }}" == "skipped" ]; then
+            echo "⏭️ **API Tests**: SKIPPED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **API Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.web-tests.result }}" == "success" ]; then
+            echo "✅ **Web E2E Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.web-tests.result }}" == "skipped" ]; then
+            echo "⏭️ **Web E2E Tests**: SKIPPED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Web E2E Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "**Browser**: ${{ github.event.inputs.browser || 'chrome' }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: ❌ Fail if any tests failed
+        if: |
+          needs.api-tests.result == 'failure' || 
+          needs.web-tests.result == 'failure'
+        run: exit 1
