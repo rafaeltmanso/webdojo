@@ -1,6 +1,12 @@
 name: Full Test Suite
 
 on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       run_api_tests:
@@ -22,9 +28,6 @@ on:
           - chrome
           - firefox
           - edge
-  schedule:
-    # Run nightly at 2 AM UTC
-    - cron: '0 2 * * *'
 
 jobs:
   # Job 1: API Tests
@@ -32,7 +35,8 @@ jobs:
     name: API Tests - Full Suite
     runs-on: ubuntu-22.04
     if: |
-      github.event_name == 'schedule' || 
+      github.event_name == 'push' || 
+      github.event_name == 'pull_request' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_api_tests)
     
     services:
@@ -98,7 +102,8 @@ jobs:
     runs-on: ubuntu-22.04
     needs: api-tests
     if: |
-      (github.event_name == 'schedule' || 
+      (github.event_name == 'push' || 
+       github.event_name == 'pull_request' ||
        (github.event_name == 'workflow_dispatch' && inputs.run_web_tests)) &&
       (needs.api-tests.result == 'success' || needs.api-tests.result == 'skipped')
     

@@ -219,11 +219,13 @@ This project is integrated with **Cypress Cloud** and **GitHub Actions** for aut
 
 ```bash
 # Tests automatically run on push/PR via GitHub Actions
+# Can also be triggered manually with custom options
 # Results are uploaded to Cypress Cloud dashboard
 ```
 
 **Features:**
-- Automated test execution on every push and pull request
+- Automated test execution on every push and pull request to main branch
+- Manual workflow trigger with customizable options (browser selection, test suite selection)
 - Test recordings and video replays in Cypress Cloud
 - Performance analytics and flaky test detection
 - Team collaboration with shared test results
